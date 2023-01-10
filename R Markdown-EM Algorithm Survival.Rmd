@@ -1,0 +1,95 @@
+---
+title: "EM Algorithm - Survival Data"
+author: "Matthew Scott | mscott24@bu.edu"
+date: "January 2023"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+<br>
+
+**Question** Let $t_{1}, t_{2}, ..., t_{n}$ i.d.d. with pdf $\rho exp(-\rho t)$, i.e., exponential with parameter $\rho$. Supposed that we observe $(y_{i}, \delta_{i})$, where $y_{i}=min(t_{i}, c_{i})$ and $\delta_{i}=i$ if $t_{i}<c_{i}$ and 0 otherwise for $i=1,2,...,n$. Implement an EM-algorithm for the Stanford Heart Transplant data (for the variables survival time $y$ and survival status $\delta$) and compute the standard error of the estimate $\hat{\rho}_{MLE}$.
+
+<br>
+
+**Derivation** 
+Assume that $Y_{1},...,Y_{m}$ are non-censored data and the rest of the observation are censored with censoring times given by $c_{m+1}, ..., c_{n}$. Let $Z_{m+1},..., Z_{n}$ be the survival times for the censored data, with the complete data likelihood given by
+
+$$
+\begin{aligned}
+  p(\rho | y, z) & \propto \rho^{n} exp[-\rho (\sum_{i=1}^{m}y_{i}+\sum_{i=m+1}^{n}z_{i})] \\
+  log p(\rho | y, z) & \propto n log \rho -\rho (\sum_{i=1}^{m}y_{i}+\sum_{i=m+1}^{n}z_{i}) \\
+\end{aligned}
+$$
+
+The conditional predictive distribution of $z$ given $Z>c$ is a truncated exponential distribution. Due to the memoryless property of exponential distributions, we have
+$$
+\begin{aligned} 
+E(Z_{i}|Z_{i}>c_{i}, \rho^{(k)}) & = c_{i}+\frac{1}{\rho^{(k)}} \\ 
+\end{aligned}
+$$
+Thus
+$$
+\begin{aligned} 
+  Q(\rho, \rho^{(k)}) & = n log \rho - \rho (\sum_{i=1}^{m} y_{i} + \sum_{i=m+1}^{n} (c_{i} + \frac{1}{\rho^{(k)}}))\\
+\end{aligned}
+$$
+
+In the M-step, we maximize $Q(\rho, \rho^{(k)})$, leading to the EM update
+$$
+\begin{aligned} 
+  \rho^{(k+1)} & = \frac{n} {\sum_{i=1}^{m} y_{i} + \sum_{i=m+1}^{n} (c_{i} + \frac{1}{\rho^{(k)}})} \\
+\end{aligned}
+$$
+
+The SE can be found via Louis's method
+$$
+\begin{aligned} 
+      \frac{d^{2}}{d \rho^{2}}  Q(\rho, \rho_{EM}) & =  \frac{n}{\rho_{EM}^{2}} \\
+      \rightarrow Var(\frac{d}{d \rho} log p(\rho | y, z)) & = \sum_{i=m+1}^{n}  Var(z_{i}|z_{i} > c_{i}, \rho_{EM}) = \frac{n-m}{\rho_{EM}^{2}} \\
+\end{aligned}
+$$
+
+Thus the observed Fisher information evaulated at $\rho_{EM}$ is 
+$$
+\begin{aligned} 
+  \frac{n}{\rho_{EM}^{2}}-\frac{n-m}{\rho_{EM}^{2}} &= \frac{m}{\rho_{EM}^{2}} \\
+  \rightarrow \boxed{SE=\frac{\hat{\rho}_{EM}}{\sqrt(m)}} \\
+\end{aligned}
+$$
+<br>
+
+**EM Algorithm**
+```{r}
+library(survival)
+
+#initialize
+r <- rep(NA,1000)
+r[1] <- 0.0001
+n <- length(stanford2$time)
+
+#perform iterations
+for(k in 1:999) {
+  r[k+1]<-n/{sum(stanford2$time[stanford2$status==0]) + sum(stanford2$time[stanford2$status==1]+(1/r[k]))}
+  mle_em <- r[k+1]
+  #stop is convergence is reached
+  if(abs(r[k+1]-r[k]) < 10^(-10)) {break}
+}
+#calculate SE
+se_em <- mle_em/sqrt(length(stanford2$time[stanford2$status==0]))
+```
+<br>
+
+**Estimated $\hat{\rho}_{MLE}$**
+```{r}
+mle_em
+```
+<br>
+
+**SE of $\hat{\rho}_{MLE}$**
+```{r}
+se_em
+```
